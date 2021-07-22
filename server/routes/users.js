@@ -1,9 +1,15 @@
-var express = require('express');
-var router = express.Router();
+const express = require('express');
+const router = express.Router();
+const pool = require('../config/psql_config');
 
 /* GET users listing. */
 router.get('/', function(req, res, next) {
-  res.send('respond with a resource');
+  pool.query('SELECT * FROM users', (err, results) => {
+    if (err) {
+      throw (err);
+    }
+    res.status(200).json(results.rows);
+  })
 });
 
 module.exports = router;
