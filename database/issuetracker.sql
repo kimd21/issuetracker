@@ -1,18 +1,20 @@
 CREATE TABLE IF NOT EXISTS "user"(
   id SERIAL PRIMARY KEY,
-  first_name VARCHAR(30) NOT NULL,
-  last_name VARCHAR(30) NOT NULL,
+  first_name VARCHAR(30),
+  last_name VARCHAR(30),
+  asignee ASIGNEE,
   birth_date DATE,
-  email VARCHAR(100) NOT NULL, 
-  joined_on TIMESTAMP NOT NULL,
-  last_logged_on TIMESTAMP NOT NULL
+  username VARCHAR(255) UNIQUE,
+  password VARCHAR(100),
+  email VARCHAR(100), 
+  joined_on TIMESTAMPTZ NOT NULL,
+  last_logged_on TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS issue(
   issue_id SERIAL PRIMARY KEY,
   uid SERIAL,
   task_type TASK_TYPE,
-  asignee ASIGNEE,
   status STATUS,
   category CATEGORY,
   version NUMERIC(2,1),
