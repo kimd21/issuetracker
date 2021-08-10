@@ -1,17 +1,18 @@
 const router = require('express').Router();
-const profileController = require('../controllers/profileController');
+const userController = require('../controllers/userController');
+const itemRouter = require('./issue');
 
-/* GET users listing. */
-router.get('/', (req, res) => {
-  res.json(req.user);
-});
+// Get profile of specified user
+router.get('/:userId', userController.user_get);
 
-router.get('/profile', profileController.profile_get);
+// Only ADMIN and developers can create new user
+// router.post('/:userId', userController.user_post);
 
-router.post('/profile', profileController.profile_post);
 
-router.put('/profile', profileController.profile_put);
+// router.put('/:userId', userController.user_put);
 
-router.delete('/profile', profileController.profile_delete);
+// router.delete('/:userId', userController.user_delete);
+
+// router.use('/:userId/items', itemRouter);
 
 module.exports = router;

@@ -43,7 +43,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/user', passport.authenticate('jwt', {session: false}), userRouter);
+app.use('/users', passport.authenticate('jwt', {session: false}), userRouter);
 app.use('/register', registerRouter);
 app.use('/login', loginRouter);
 
