@@ -18,8 +18,9 @@ router.post('/', (req, res, next) => {
 
   bcrypt.hash(r.password, 10, (err, hashpw) => {
     if (err) {next(err);}
-    const values = [r.username, hashpw, 'Guest'];
-    pool.query('INSERT INTO "user"(username, password, asignee, joined_on) VALUES ($1, $2, $3, NOW())', values, (err) => {
+    // Default role assigned is 'Guest'
+    const fields = [r.username, hashpw, 'Guest'];
+    pool.query('INSERT INTO "user"(username, password, asignee, joined_on) VALUES ($1, $2, $3, NOW())', fields, (err) => {
       if (err) {return next(err);}
       loginController.login_post(req, res, next);
     });

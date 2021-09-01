@@ -1,18 +1,23 @@
 const router = require('express').Router();
 const userController = require('../controllers/userController');
-const itemRouter = require('./issue');
+const { userValidator } = require('../middlewares/userValidator');
+//const issueRouter = require('./issue');
 
-// Get profile of specified user
+// Get all user profiles authorized for viewing
+router.get('/', userController.user_getAll);
+
+// Post (create) user profile
+router.post('/', userValidator, userController.user_post);
+
+// Get profile of userId
 router.get('/:userId', userController.user_get);
 
-// Only ADMIN and developers can create new user
-// router.post('/:userId', userController.user_post);
+// Update profile of userId
+router.put('/:userId', userValidator, userController.user_put);
 
+// Delete profile of userId
+router.delete('/:userId', userController.user_delete);
 
-// router.put('/:userId', userController.user_put);
-
-// router.delete('/:userId', userController.user_delete);
-
-// router.use('/:userId/items', itemRouter);
+//router.use('/:userId/issues', issueRouter);
 
 module.exports = router;

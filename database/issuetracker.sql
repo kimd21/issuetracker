@@ -13,15 +13,16 @@ CREATE TABLE IF NOT EXISTS "user"(
 
 CREATE TABLE IF NOT EXISTS issue(
   issue_id SERIAL PRIMARY KEY,
+  problem VARCHAR(1000),
   uid SERIAL,
   task_type TASK_TYPE,
   status STATUS,
   category CATEGORY,
   version NUMERIC(2,1),
   priority PRIORITY,
-  created_at TIMESTAMP NOT NULL,
-  due_date TIMESTAMP,
-  registered_by VARCHAR(100) UNIQUE NOT NULL, 
+  created_at TIMESTAMPTZ NOT NULL,
+  due_date TIMESTAMPTZ,
+  registered_by VARCHAR(100) NOT NULL, 
   CONSTRAINT fk_user
     FOREIGN KEY(uid) 
       REFERENCES "user"(id)
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS issue(
       ON UPDATE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS comments(
+CREATE TABLE IF NOT EXISTS comment(
   comment_id SERIAL PRIMARY KEY,
   uid SERIAL,
   iid SERIAL,

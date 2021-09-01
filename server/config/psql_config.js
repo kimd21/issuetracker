@@ -1,4 +1,4 @@
-const fs = require('fs');
+const fs = require('fs').promises;
 const pg = require('pg');
 const Pool = pg.Pool;
 const dotenv = require('dotenv').config();
@@ -12,51 +12,44 @@ const pool = new Pool({
   port: process.env.PSQL_PORT
 });
 
-// Read in sql file
-const sql = fs.readFileSync('../database/issuetracker.sql').toString();
-
-// Split sql queries into an array to run individually in sequence
-const sqlArr = sql.split(');');
-
-// Remove last value (delimiter itself) from array
-sqlArr.pop();
-
 // Create postgres data types to build tables
 const type_query = (
-  `DO 
-  $$
+  `DO $$
   BEGIN
-    IF NOT EXISTS (SELECT * FROM pg_type) THEN
-      CREATE TYPE TASK_TYPE AS ENUM ('task', 'request', 'bug');
-      CREATE TYPE ASIGNEE AS ENUM ('Guest', 'Developer', 'ADMIN');
-      CREATE TYPE STATUS AS ENUM ('open', 'closed', 'in progress', 'resolved');
-      CREATE TYPE CATEGORY AS ENUM ('back end', 'front end');
-      CREATE TYPE PRIORITY AS ENUM ('low', 'medium', 'high');
-    END IF;
-  END;
-  $$`
+    CREATE TYPE TASK_TYPE AS ENUM ('task', 'request', 'bug');
+    CREATE TYPE ASIGNEE AS ENUM ('Guest', 'Developer', 'ADMIN');
+    CREATE TYPE STATUS AS ENUM ('open', 'closed', 'in progress', 'resolved');
+    CREATE TYPE CATEGORY AS ENUM ('back end', 'front end');
+    CREATE TYPE PRIORITY AS ENUM ('low', 'medium', 'high');
+  EXCEPTION
+    WHEN duplicate_object THEN null;
+  END $$;`
 );
 
-pool.query(type_query, (err) => {
-  if (err) {
-    throw (err);
-  }
-});
+// Split sql queries into an array to run individually in sequence
+const delimeter = ');';
 
-// Run sql queries
-sqlArr.forEach(sql_query => {
-  // Add delimiter back in
-  sql_query += ');';
+// IIFE async/await call (can't use top level await with CommonJS modules in NodeJS)
+(async () => {
+  // Read in sql file
+  let data = await fs.readFile('../database/issuetracker.sql').catch(err => {throw(err);});
 
-  // Remove newline characters
-  sql_query.replace(/\n/g, '');
+  // Convert sql file to array of commands split by delimter (remove delimter itself from array)
+  const sqlArr = data.toString().split(delimeter).pop();
 
-  // Query the pool
-  pool.query(sql_query, (err) => {
-    if (err) {
-      throw (err);
-    }
-  });
-})
+  // Create types
+  await pool.query(type_query).catch(err => {throw(err);});
+  // Run all sql queries
+  for (let sql_query of sqlArr) {
+    //Add delimiter back in
+   sql_query += delimeter;
+
+   // Remove newline characters
+   sql_query.replace(/\n/g, '');
+
+   // Query the pool
+   await pool.query(sql_query);
+ }
+})();
 
 module.exports = pool;

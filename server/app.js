@@ -43,6 +43,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Authenticate user route with JWT
 app.use('/users', passport.authenticate('jwt', {session: false}), userRouter);
 app.use('/register', registerRouter);
 app.use('/login', loginRouter);
@@ -59,8 +60,9 @@ app.use(function(err, req, res, next) {
   res.locals.error = req.app.get('env') === 'development' ? err : {};
 
   // render the error page
-  res.status(err.status || 500);
-  res.render('error');
+  res.status(err.status || 500).send(err.stack);
+
+  // res.render('error');
 });
 
 module.exports = app;
