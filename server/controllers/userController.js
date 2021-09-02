@@ -32,11 +32,14 @@ exports.user_get = async (req, res, next) => {
 
   // Get id and role of user with userId
   let data;
-  try {await pool.query('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]);}
+  try {data = await pool.query('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]);}
   catch (err) {next(err);return;}
 
   // Data of user with userId
-  const user = data.rows[0] ?? res.status(400).send('User does not exist');
+  const user = data.rows[0]; 
+  if (user == undefined || null) {
+    return res.status(400).send('User does not exist');
+  }
   const user_id = user.id;
   const user_role = user.asignee;
 
@@ -117,7 +120,10 @@ exports.user_put = async (req, res, next) => {
   catch (err) {next(err);return;}
 
   // Data of user with userId
-  const user = data.rows[0] ?? res.status(400).send('User does not exist');
+  const user = data.rows[0]; 
+  if (user == undefined || null) {
+    return res.status(400).send('User does not exist');
+  }
   const user_id = user.id;
   const user_role = user.asignee;
 
@@ -171,12 +177,15 @@ exports.user_put = async (req, res, next) => {
 
 exports.user_delete = async (req, res, next) => { 
   // Get id and role of user with userId
-  let data 
+  let data;
   try {data = await pool.query('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]);}
   catch (err) {next(err);return;}
 
   // Data of user with userId
-  const user = data.rows[0] ?? res.status(400).send('User does not exist');
+  const user = data.rows[0]; 
+  if (user == undefined || null) {
+    return res.status(400).send('User does not exist');
+  }
   const user_id = user.id;
   const user_role = user.asignee;
 
@@ -192,14 +201,14 @@ exports.user_delete = async (req, res, next) => {
     // ADMIN can delete everyone except other ADMIN
     case 'ADMIN':
       if (id === user_id || user_role !== 'ADMIN') {
-        try {await pool.query(query, user_id);}
+        try {await pool.query(query, [user_id]);}
         catch (err) {next(err);return;}
         break;
       }
     // Developer can delete guests
     case 'Developer':
       if (id === user_id || user_role === 'Guest') {
-        try {await pool.query(query, user_id);}
+        try {await pool.query(query, [user_id]);}
         catch (err) {next(err);return;}
         break;
       }
