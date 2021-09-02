@@ -1,2 +1,3 @@
 -todo
-let asignee roles be selected by admin only
+check other routes on userController
+finish issue and comment routes
