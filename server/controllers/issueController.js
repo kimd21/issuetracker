@@ -1,256 +1,298 @@
 const pool = require('../config/psql_config');
-const { body, validationResult } = require('express-validator');
-const dotenv = require('dotenv').config();
+
+const queryfn = async(query, fields) => {
+    let data = await pool.query(query, fields).catch(err => {throw(err);})
+    return data.rows;
+}
 
 exports.issue_getAll = async (req, res, next) => {
+  // Get id and role of user with userId
+  let data;
+  try {data = await queryfn('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]);}
+  catch (err) {return next(err);}
+
+  // Data of user with userId
+  if (!data?.length) {
+    return res.status(400).send('User does not exist');
+  }
+
+  const user = data[0];
+  const user_id = user.id;
+  const user_role = user.asignee;
+
+  // Id of signed JWT user token
+  const id = req.user.id;
+  const role = req.user.asignee;
+
+  const query = 'SELECT issue.* FROM issue NATURAL JOIN "user" WHERE id = $1';
+  const fields = [req.params.userId];
+
   let issues_data;
-  switch (req.issue.asignee) {
-    // 'Guest' cannot access this route
-    case 'Guest':
-      return res.status(403).send('Unauthorized access, permission denied');
+  switch (role) {
     // 'ADMIN' can access all profiles except other ADMINS
     case 'ADMIN':
-      issues_data = await pool.query('SELECT * FROM "user" WHERE asignee != $1 NATURAL JOIN issue ON "user".id = issue.uid', ['ADMIN']).catch(err => next(err));
-      break;
+      if (id === user_id || user_role !== 'ADMIN') {
+        try {issues_data = await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
     // 'Developer' can access all guests
     case 'Developer':
-      issues_data = await pool.query('SELECT * FROM "user" WHERE asignee = $1 NATURAL JOIN issue ON "user".id = issue.uid', ['Guest']).catch(err => next(err));
-      break;
+      if (id === user_id || user_role === 'Guest') {
+        try {issues_data = await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    case 'Guest':
+      if (id === user_id) {
+        try {issues_data = await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
     default:
       return res.status(403).send('Unauthorized access, permission denied');
   }
 
-  // Get personal data
-  let personal_data = await pool.query('SELECT * FROM "user" WHERE id = $1 NATURAL JOIN issue ON "user".id = issue.uid', [req.user.id]).catch(err => next(err));
-  
-  // Merge personal data with accessed data into one object
-  merged_data = Object.assign({}, [...issues_data.rows, ...personal_data.rows]);
-  return res.status(200).json(merged_data);
+  // Convert to object
+  let issues = Object.assign({}, [...issues_data]);
+
+  res.status(200).json(issues);
 }
 
-// exports.issue_get = async (req, res, next) => {
+exports.issue_get = async (req, res, next) => {
 
-//   // Get id and role of issue with userId
-//   let data = await pool.query('SELECT id, asignee FROM issue WHERE id = $1', [req.params.issueId]).catch(err => next(err));
+  // Get id and role of user with userId
+  let data;
+  try {data = await queryfn('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]);}
+  catch (err) {return next(err);}
 
-//   // Data of issue with userId
-//   const issue = data.rows[0];
-//   const issue_id = user.id;
-
-//   // Id of signed JWT issue token
-//   const id = req.issue.id;
-//   const role = req.issue.asignee;
-
-//   // Error message
-//   const err_msg = 'Unauthorized access, permission denied';
-
-//   // Query
-//   // TODO: add inner join on issue and comment tables
-//   const query = 'SELECT * FROM issue WHERE id = $1';
-
-//   let issue_data;
-//   switch (issue.asignee) {
-//     // If issue is 'ADMIN', send user data only if owner
-//     case 'ADMIN':
-//       if (issue_id === id) {
-//         issue_data = await pool.query(query, [user_id]);
-//         res.status(200).json(issue_data.rows[0]);
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     // If issue is 'Developer', send user data only if owner or ADMIN
-//     case 'Developer':
-//       if (issue_id === id || role === 'ADMIN') {
-//         issue_data = await pool.query(query, [user_id]);
-//         res.status(200).json(issue_data.rows[0]);
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     // If issue is 'Guest', send user data only if owner, developer, or ADMIN
-//     case 'Guest':
-//       if (issue_id === id || role === 'ADMIN' || role === 'Developer') {
-//         issue_data = await pool.query(query, [user_id]);
-//         res.status(200).json(issue_data.rows[0]);
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     default:
-//       return res.status(403).send(err_msg);
-//   }
-// }
-
-exports.issue_post = async (req, res, next) => {
-  // Body sanitization
-  body('problem', 'Problem must not be empty').trim().isLength({min: 1, max: 1000}).escape();
-  body('task_type', 'Task type must not be empty').isIn(['task', 'request', 'bug']);
-  body('status', 'Status must not be empty').isIn(['open', 'closed', 'in progress', 'resolved']);
-  body('category', 'Category must not be empty').isIn(['back end', 'front end']);
-  // Version number is auto assigned to 1.0
-  body('priority', 'Priority must not be empty').isIn(['low', 'medium', 'high']);
-  // Created_at is auto assigned to 
-  body('due_date', 'Due date must not be empty').isISO8601();
-  body('registered_by', 'Registered by must not be empty').trim().isLength({min: 1, max: 100}).escape();
-  const errors = validationResult(req.body);
-  if (!errors.isEmpty()) {
-    return next(err);
+  // Data of user with userId
+  if (!data?.length) {
+    return res.status(400).send('User does not exist');
   }
-
-  // Get id and role of issue with userId
-  let data = await pool.query('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]).catch(err => next(err));
-
-  // Data of issue with userId
-  const user = data.rows[0];
+  const user = data[0];
   const user_id = user.id;
   const user_role = user.asignee;
 
-  // Id of signed JWT issue token
+  // Id of signed JWT user token
   const id = req.user.id;
   const role = req.user.asignee;
 
-  // Error message
-  const err_msg = 'Unauthorized access, permission denied';
+  // Query
+  const query = 'SELECT * FROM issue WHERE issue_id = $1';
+  const fields = [req.params.issueId];
+
+  let issue_data;
+  switch (role) {
+    // If 'ADMIN', send data only if owner or not ADMIN
+    case 'ADMIN':
+      if (id === user_id || user_role !== 'ADMIN') {
+        try {issue_data = await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    // If 'Developer', send data only if owner or guest
+    case 'Developer':
+      if (id === user_id || user_role === 'Guest') {
+        try {issue_data = await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    // If 'Guest', send data only if owner
+    case 'Guest':
+      if (id === user_id) {
+        try {issue_data = await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    default:
+      return res.status(403).send('Unauthorized access, permission denied');
+  }
+
+  if (!issue_data?.length) {
+    return res.status(400).send('Issue does not exist');
+  }
+
+  res.status(200).json(issue_data[0]);
+}
+
+exports.issue_post = async (req, res, next) => {
+
+  // Get id and role of user with userId
+  let data; 
+  try {data = await queryfn('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]);}
+  catch (err) {next(err);return;}
+
+  // Data of user with userId
+  if (!data?.length) {
+    return res.status(400).send('User does not exist');
+  }
+  const user = data[0];
+  const user_id = user.id;
+  const user_role = user.asignee;
+
+  // Id of signed JWT user token
+  const id = req.user.id;
+  const role = req.user.asignee;
 
   // Query
   const r = req.body;
-  const fields = [r.problem, user_id, r.task_type, r.status, r.category, 1.0, r.priority, r.due_date, r.registered_by];
-  const query = `INSERT INTO issue(problem, uid, task_type, status, category, version, priority, due_date, registered_by, created_at) 
-  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`;
+  const fields = [r.problem_title, r.problem, user_id, r.task_type, r.status, r.category, 
+    1.0, r.priority, r.due_date, req.user.username];
+  const query = `INSERT INTO issue(problem_title, problem, id, task_type, status, category, 
+    version, priority, due_date, registered_by, created_at) 
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`;
   
   // All owners can post to their own account
   switch (role) {
     // ADMIN can post to everyone except other ADMINs
     case 'ADMIN':
       if (id === user_id || user_role !== 'ADMIN') {
-        await pool.query(query, fields).catch(err => next(err));
-        break;
+        try {await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
       }
-      res.status(403).send(err_msg);
     // Developer can post to guests
     case 'Developer':
       if (id === user_id || user_role === 'Guest') {
-        await pool.query(query, fields).catch(err => next(err));
-        break;
+        try {await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
       }
-      res.status(403).send(err_msg);
+    // Guests can only post to own account
     case 'Guest':
       if (id === user_id) {
-        await pool.query(query, fields).catch(err => next(err));
-        break;
+        try {await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
       }
-      res.status(403).send(err_msg);
     default:
-      res.status(403).send(err_msg);
+      res.status(403).send('Unauthorized access, permission denied');
   }
+  res.status(201).send('Issue created successfully');
 }
 
-// exports.issue_put = async (req, res, next) => { 
-//   // Body sanitization
-//   body('asignee', 'Asignee must not be empty').isIn(['ADMIN', 'Developer', 'Guest']);
-//   body('issueName', 'Username must not be empty').trim().isLength({min: 1, max: 255}).escape();
-//   body('password', 'Password must not be empty').trim().isLength({min: 1, max: 100}).escape();
-//   body('firstName', 'First name must not be empty').trim().isLength({min: 1, max: 30}).escape();
-//   body('lastName', 'Last name must not be empty').trim().isLength({min: 1, max: 30}).escape();
-//   body('birthDate', 'Birth date must not be empty').isISO8601().toDate();
-//   body('email', 'Email must not be empty').isEmail().normalizeEmail();
-//   const errors = validationResult(req.body); 
-//   if (!errors.isEmpty()) {
-//     return next(err);
-//   }
+exports.issue_put = async (req, res, next) => { 
 
-//   // Get id and role of issue with userId
-//   let data = await pool.query('SELECT id, asignee FROM issue WHERE id = $1', [req.params.issueId]).catch(err => next(err));
+  // Get id and role of user with userId
+  let data;
+  try {data = await queryfn('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId]);}
+  catch (err) {return next(err);}
 
-//   // Data of issue with userId
-//   const issue = data.rows[0];
-//   const issue_id = user.id;
-//   const issue_role = user.asignee;
+  // Data of user with userId
+  if (!data?.length) {
+    return res.status(400).send('User does not exist');
+  }
 
-//   // Id of signed JWT issue token
-//   const id = req.issue.id;
-//   const role = req.issue.asignee;
+  // Get issue with issueId
+  let issue_data;
+  try {issue_data = await queryfn('SELECT * FROM issue WHERE issue_id = $1', [req.params.issueId]);}
+  catch (err) {return next(err);}
 
-//   // Error message
-//   const err_msg = 'Unauthorized access, permission denied';
+  // Data of issue with issueId
+  if (!issue_data?.length) {
+    return res.status(400).send('Issue does not exist');
+  }
+  
+  const user = data[0];
+  const user_id = user.id;
+  const user_role = user.asignee;
 
-//   // Query
-//   const r = req.body;
-//   const fields = [r.asignee, r.issueName, r.password, r.firstName, r.lastName, r.birthDate, r.email, user_id];
-//   // coalesce: if input is null, just use existing parameter
-//   const query = `UPDATE issue SET 
-//     asignee = COALESCE($1, asignee),
-//     issuename = COALESCE($2, username),
-//     password = COALESCE($3, password),
-//     first_name = COALESCE($4, first_name),
-//     last_name = COALESCE($5, last_name),
-//     birth_date = COALESCE($6, birth_date), 
-//     email = COALESCE($7, email) 
-//     WHERE id = $8`;
+  // Id of signed JWT user token
+  const id = req.user.id;
+  const role = req.user.asignee;
 
-//   // Owners can update their own account
-//   switch (role) {
-//     // ADMIN can assign roles to everyone except other ADMIN
-//     case 'ADMIN':
-//       if (id === issue_id || user_role !== 'ADMIN') {
-//         await pool.query(query, fields);
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     // Developer can assign roles to guests
-//     case 'Developer':
-//       if (id === issue_id || user_role === 'Guest') {
-//         await pool.query(query, fields);
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     // Guests cannot change roles
-//     case 'Guest':
-//       if (id === issue_id) {
-//         await pool.query(query, ['Guest', fields.slice(1)]);
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     default:
-//       return res.status(403).send(err_msg);
-//   }
-// }
+  // Query
+  const r = req.body;
+  const fields = [r.problem_title, r.problem, user_id, r.task_type, r.status, r.category, r.version, r.priority, 
+    r.due_date, req.user.username, req.params.issueId];
+  
+  // If input is null, don't update the value
+  const query = `UPDATE issue SET 
+    problem_title = COALESCE(NULLIF($1, ''), problem_title),
+    problem = COALESCE(NULLIF($2, ''), problem),
+    id = COALESCE(NULLIF($3, '')::NUMERIC, id),
+    task_type = COALESCE(NULLIF($4, '')::TASK_TYPE, task_type),
+    status = COALESCE(NULLIF($5, '')::STATUS, status),
+    category = COALESCE(NULLIF($6, '')::CATEGORY, category),
+    version = COALESCE(NULLIF($7, '')::NUMERIC, version), 
+    priority = COALESCE(NULLIF($8, '')::PRIORITY, priority),
+    due_date = COALESCE(NULLIF($9, '')::TIMESTAMPTZ, due_date),
+    registered_by = COALESCE(NULLIF($10, ''), registered_by)
+    WHERE issue_id = $11`;
 
-// exports.issue_delete = async (req, res, next) => { 
-//   // Get id and role of issue with userId
-//   let data = await pool.query('SELECT id, asignee FROM issue WHERE id = $1', [req.params.issueId]).catch(err => next(err));
+  // Owners can update their own account
+  switch (role) {
+    // ADMIN can update everyone except other ADMIN
+    case 'ADMIN':
+      if (id === user_id || user_role !== 'ADMIN') {
+        try {await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    // Developer can update guests
+    case 'Developer':
+      if (id === user_id || user_role === 'Guest') {
+        try {await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    // Guests only update own account
+    case 'Guest':
+      if (id === user_id) {
+        try {await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    default:
+      return res.status(403).send('Unauthorized access, permission denied');
+  }
+  res.status(200).json('Issue updated successfully');
+}
 
-//   // Data of issue with userId
-//   const issue = data.rows[0];
-//   const issue_id = user.id;
-//   const issue_role = user.asignee;
+exports.issue_delete = async (req, res, next) => { 
+  // Get id and role of user with userId
+  let data;
+  try {data = await queryfn('SELECT id, asignee FROM "user" WHERE id = $1', [req.params.userId])}
+  catch (err) {return next(err);}
 
-//   // Id of signed JWT issue token
-//   const id = req.issue.id;
-//   const role = req.issue.asignee;
+  // Data of user with userId
+  if (!data?.length) {
+    return res.status(400).send('User does not exist');
+  }
 
-//   // Error message
-//   const err_msg = 'Unauthorized access, permission denied';
+  // Get issue with issueId
+  let issue_data;
+  try {issue_data = await queryfn('SELECT * FROM issue WHERE issue_id = $1', [req.params.issueId]);}
+  catch (err) {return next(err);}
 
-//   // Query
-//   const query = 'DELETE FROM issue WHERE id = $1';
+  // Data of issue with issueId
+  if (!issue_data?.length) {
+    return res.status(400).send('Issue does not exist');
+  }
+  
+  const user = data[0];
+  const user_id = user.id;
+  const user_role = user.asignee;
 
-//   // All owners can delete their own account
-//   switch (role) {
-//     // ADMIN can delete everyone except other ADMIN
-//     case 'ADMIN':
-//       if (id === issue_id || user_role !== 'ADMIN') {
-//         await pool.query(query, issue_id).catch(err => next(err));
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     // Developer can delete guests
-//     case 'Developer':
-//       if (id === issue_id || user_role === 'Guest') {
-//         await pool.query(query, issue_id).catch(err => next(err));
-//         break;
-//       }
-//       return res.status(403).send(err_msg);
-//     // Guests cannot access this route
-//     default:
-//       return res.status(403).send(err_msg);
-//   }
-// }
+  // Id of signed JWT user token
+  const id = req.user.id;
+  const role = req.user.asignee;
+
+  // Query
+  const query = 'DELETE FROM issue WHERE issue_id = $1';
+  const fields = [req.params.issueId];
+
+  // All owners can delete their own account
+  switch (role) {
+    // ADMIN can delete everyone except other ADMIN
+    case 'ADMIN':
+      if (id === user_id || user_role !== 'ADMIN') {
+        try {await queryfn(query, fields)}
+        catch (err) {return next(err);} break;
+      }
+    // Developer can delete guests
+    case 'Developer':
+      if (id === user_id || user_role === 'Guest') {
+        try {await queryfn(query, fields)}
+        catch (err) {return next(err);} break;
+      }
+    // Guests can only delete own issue
+    case 'Guest':
+      if (id === user_id) {
+        try {await queryfn(query, fields);}
+        catch (err) {return next(err);} break;
+      }
+    default:
+      return res.status(403).send('Unauthorized access, permission denied');
+  }
+  res.status(200).json('Issue was successfully deleted');
+}

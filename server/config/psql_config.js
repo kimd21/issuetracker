@@ -32,13 +32,15 @@ const delimeter = ');';
 // IIFE async/await call (can't use top level await with CommonJS modules in NodeJS)
 (async () => {
   // Read in sql file
-  let data = await fs.readFile('../database/issuetracker.sql').catch(err => {throw(err);});
-
+  let data;
+  try {data = await fs.readFile('../database/issuetracker.sql');}
+  catch (err) {throw(err);}
   // Convert sql file to array of commands split by delimter (remove delimter itself from array)
   const sqlArr = data.toString().split(delimeter).pop();
 
   // Create types
-  await pool.query(type_query).catch(err => {throw(err);});
+  try {await pool.query(type_query);}
+  catch (err) {throw(err);}
   // Run all sql queries
   for (let sql_query of sqlArr) {
     //Add delimiter back in
@@ -48,7 +50,8 @@ const delimeter = ');';
    sql_query.replace(/\n/g, '');
 
    // Query the pool
-   await pool.query(sql_query);
+   try {await pool.query(sql_query);}
+   catch (err) {throw(err);}
  }
 })();
 
