@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS issue(
   priority PRIORITY,
   created_at TIMESTAMPTZ NOT NULL,
   due_date TIMESTAMPTZ,
-  registered_by VARCHAR(100) NOT NULL, 
+  registered_by VARCHAR(255) NOT NULL, --Change to 255 in database
   CONSTRAINT fk_user
     FOREIGN KEY(id) 
       REFERENCES "user"(id)
@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS comment(
   issue_id SERIAL,
   comment_title VARCHAR(255),
   comment VARCHAR(255),
+  created_at TIMESTAMPTZ NOT NULL,  --Add to database
+  registered_by VARCHAR(255) NOT NULL, --Add to database
   CONSTRAINT fk_issue
     FOREIGN KEY (issue_id)
       REFERENCES issue(issue_id)

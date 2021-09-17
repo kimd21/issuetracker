@@ -1,2 +1,2 @@
 -todo
-finish comment routes, comment validator, update issuetracker.sql
+start front end
