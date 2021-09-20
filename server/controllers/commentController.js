@@ -36,8 +36,8 @@ exports.comment_getAll = async (req, res, next) => {
   const id = req.user.id;
   const role = req.user.asignee;
 
-  const query = 'SELECT comment.* FROM comment NATURAL JOIN issue WHERE issue_id = $1 AND id = $2';
-  const fields = [req.params.issueId, issue_id, user_id];
+  const query = 'SELECT * FROM comment WHERE issue_id = $1 AND id = $2';
+  const fields = [issue_id, user_id];
 
   let comments_data;
   switch (role) {
@@ -243,16 +243,14 @@ exports.comment_put = async (req, res, next) => {
 
   // Query
   const r = req.body;
-  const fields = [r.comment_title, r.comment, user_id, issue_id, req.user.username, req.params.commentId];
+  const fields = [r.comment_title, r.comment, req.user.username, req.params.commentId, user_id, issue_id];
   
   // If input is null, don't update the value
   const query = `UPDATE comment SET 
     comment_title = COALESCE(NULLIF($1, ''), comment_title),
     comment = COALESCE(NULLIF($2, ''), comment),
-    id = COALESCE(NULLIF($3, '')::NUMERIC, id),
-    issue_id = COALESCE(NULLIF($4, '')::NUMERIC, task_type),
-    registered_by = COALESCE(NULLIF($5, ''), registered_by)
-    WHERE comment_id = $6 AND user_id = $3 AND issue_id = $4`;
+    registered_by = COALESCE(NULLIF($3, ''), registered_by)
+    WHERE comment_id = $4 AND id = $5 AND issue_id = $6`;
 
   // Owners can update their own account
   switch (role) {

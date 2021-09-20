@@ -24,7 +24,7 @@ exports.issue_getAll = async (req, res, next) => {
   const id = req.user.id;
   const role = req.user.asignee;
 
-  const query = 'SELECT issue.* FROM issue NATURAL JOIN "user" WHERE id = $1';
+  const query = 'SELECT * FROM issue WHERE id = $1';
   const fields = [req.params.userId];
 
   let issues_data;
@@ -195,22 +195,21 @@ exports.issue_put = async (req, res, next) => {
 
   // Query
   const r = req.body;
-  const fields = [r.problem_title, r.problem, user_id, r.task_type, r.status, r.category, r.version, r.priority, 
-    r.due_date, req.user.username, req.params.issueId];
+  const fields = [r.problem_title, r.problem, r.task_type, r.status, r.category, r.version, r.priority, 
+    r.due_date, req.user.username, req.params.issueId, user_id];
   
   // If input is null, don't update the value
   const query = `UPDATE issue SET 
     problem_title = COALESCE(NULLIF($1, ''), problem_title),
     problem = COALESCE(NULLIF($2, ''), problem),
-    id = COALESCE(NULLIF($3, '')::NUMERIC, id),
-    task_type = COALESCE(NULLIF($4, '')::TASK_TYPE, task_type),
-    status = COALESCE(NULLIF($5, '')::STATUS, status),
-    category = COALESCE(NULLIF($6, '')::CATEGORY, category),
-    version = COALESCE(NULLIF($7, '')::NUMERIC, version), 
-    priority = COALESCE(NULLIF($8, '')::PRIORITY, priority),
-    due_date = COALESCE(NULLIF($9, '')::TIMESTAMPTZ, due_date),
-    registered_by = COALESCE(NULLIF($10, ''), registered_by)
-    WHERE issue_id = $11 AND id = $3`;
+    task_type = COALESCE(NULLIF($3, '')::TASK_TYPE, task_type),
+    status = COALESCE(NULLIF($4, '')::STATUS, status),
+    category = COALESCE(NULLIF($5, '')::CATEGORY, category),
+    version = COALESCE(NULLIF($6, '')::NUMERIC, version), 
+    priority = COALESCE(NULLIF($7, '')::PRIORITY, priority),
+    due_date = COALESCE(NULLIF($8, '')::TIMESTAMPTZ, due_date),
+    registered_by = COALESCE(NULLIF($9, ''), registered_by)
+    WHERE issue_id = $10 AND id = $11`;
 
   // Owners can update their own account
   switch (role) {
